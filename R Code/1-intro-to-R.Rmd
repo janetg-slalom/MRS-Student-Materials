@@ -1,0 +1,982 @@
+---
+title: 'Day One - Slalom Microsoft R Server Training'
+author: "Modified from material provided by [Ali Zaidi, alizaidi@microsoft.com](mailto:alizaidi@microsoft.com)"
+date: "January, 2017"
+output:
+    html_notebook:
+    toc: yes
+  html_document:
+    toc: yes
+    keep_md: true
+---
+
+# Course Logistics
+Lunch and snacks provided; facilities orientation, i.e bathrooms and kitchen.  Questions, anytime.
+
+## Day One
+
+### R U Ready?
+
+* The Microsoft R Family
+* The Core Principles of R
+* Functional Programming in R
+* Deep-dive into the dplyr package for data manipulation
+* The dplyrXdf package: using dplyr syntax with xdf
+
+## Day Two
+
+### Scalable Data Analysis with Microsoft R
+
+* Modelling and Scoring in with Microsoft R Server
+* Parallel Computing
+* Azure Portal: provisioning a Data Science Virtual Machine
+* HDInsights Insights
+* SQL Server and R Services
+
+## Prerequisites
+### Computing Environments
+
+* R Server 8.0.5 or above
+* Azure Credits
+* Can use the [Linux DSVM](https://azure.microsoft.com/en-us/documentation/articles/machine-learning-data-science-linux-dsvm-intro/)
+* Or the [Windows DSVM](https://azure.microsoft.com/en-us/documentation/articles/machine-learning-data-science-provision-vm/)
+* For IDE: use [RTVS](https://www.visualstudio.com/vs/rtvs/), [RStudio Server](https://www.rstudio.com/products/rstudio/download3/), [JupyterHub](https://jupyterhub.readthedocs.io/en/latest/), [JupyterLab](http://jupyterlab-tutorial.readthedocs.io/en/latest/)...
+    + Whatever you're comfortable with!
+
+--> At this point, proctors should make sure each student can log into the VMs or knows how to set up their machine.
+## Development Environments
+### Where to Write R Code
+
+* For Windows machines, we have recently announced the general availability of [R Tools for Visual Studio, RTVS](https://www.visualstudio.com/en-us/features/rtvs-vs.aspx)
+* RTVS supports connectivity to Azure and SQL Server
+* The most popular integrated development environment for R is [RStudio](https://www.rstudio.com/)
+* The RStudio IDE is entirely html/javascript based, so completely cross-platform
+* RStudio Server provides a full IDE in your browser: perfect for cloud instances
+
+
+## What is R?
+### Why should I care?
+
+* R is the successor to the S Language, originated at Bell Labs AT&T
+* It is based on the Scheme interpreter
+* Originally designed by two University of Auckland Professors for their introductory statistics course
+
+![Robert Gentleman and Ross Ihaka](http://revolution-computing.typepad.com/.a/6a010534b1db25970b016766fdae38970b-800wi)
+
+## R's Philosophy
+### What R Thou?
+
+R follows the [Unix philosophy](http://en.wikipedia.org/wiki/Unix_philosophy)
+
+* Write programs that do one thing and do it well (modularity)
+* Write programs that work together (cohesiveness)
+* R is extensible with more than 10,000 packages available at CRAN (http://crantastic.org/packages)
+
+
+## The aRt of Being Lazy
+### Lazy Evaluation in R
+
+![](http://i.imgur.com/5GbW690.gif)
+
+
+* R, like it's inspiration, Scheme, is a _functional_ programming language
+* R evaluates lazily, delaying evaluation until necessary, which can make it very flexible
+* R is a highly interpreted dynamically typed language, allowing you to mutate variables and analyze datasets quickly, but is significantly slower than low-level, statically typed languages like C or Java
+* R has a high memory footprint, and can easily lead to crashes if you aren't careful
+
+## R's Programming Paradigm
+### Keys to R
+
+<span class="fragment">Everything that exist in R is an *object*</span>
+<br>
+<span class="fragment">Everything that happens in R is a *function call*</span>
+<br>
+<span class="fragment">R was born to *interface*</span>
+<br>
+
+<span class="fragment">_—John Chambers_</span>
+
+## Strengths of R
+### Where R Succeeds
+
+* Expressive
+* Open source
+* Extendable -- nearly 10,000 packages with functions to use, and that list continues to grow
+* Focused on statistics and machine learning -- cutting-edge algorithms and powerful data manipulation packages
+* Advanced data structures and graphical capabilities
+* Large user community, both within academia and industry
+* It is designed by statisticians
+
+## Weaknesses of R
+### Where R Falls Short
+
+* It is designed by statisticians
+* Inefficient at element-by-element computations
+* May make large demands on system resources, namely memory
+* Data capacity limited by memory
+* Single-threaded
+
+## Some Essential Open Source Packages
+
+* There are over 10,000 R packages to choose from, what do I start with?
+* Data Management: `dplyr`, `tidyr`, `data.table`
+* Visualization: `ggplot2`, `ggvis`, `htmlwidgets`, `shiny`
+* Data Importing: `haven`, `RODBC`, `readr`, `foreign`
+* Other favorites: `magrittr`, `rmarkdown`, `caret`
+
+# R Foundations
+
+## Command line prompts
+
+Symbol | Meaning
+------ | -------
+ `<-`   | assignment operator
+  `>`   | ready for a new command
+  `+`   | awaiting the completion of an existing command
+  `?`   | get help for following function
+
+Can change options either permanently at startup (see `?Startup`) or manually at each session with the `options` function, `options(repos = " ")` for example.
+
+Check your CRAN mirror with `getOption("repos")`.
+
+## I'm Lost!
+### Getting Help for R
+
+* [Stack Overflow](http://stackoverflow.com/questions/tagged/r)
+* [R Reference Card](https://cran.r-project.org/doc/contrib/Short-refcard.pdf)
+* [RStudio Cheat Sheets](https://www.rstudio.com/resources/cheatsheets/)
+* [R help mailing list and archives](https://stat.ethz.ch/mailman/listinfo/r-help)
+* [Revolutions Blog](http://blog.revolutionanalytics.com/)
+* [R-Bloggers](http://www.r-bloggers.com/)
+* [RSeek](rseek.org)
+* [RDocumentation](https://www.rdocumentation.org/)
+
+## Quick Tour of Things You Need to Know
+### Data Structures
+
+> "Bad programmers worry about the code.
+> Good programmers worry about data structures and their relationships."
+> - Linus Torvalds
+
+* R's data structures can be described by their dimensionality, and their type.
+
+
+|    | Homogeneous   | Heterogeneous |
+|----|---------------|---------------|
+| 1d | Atomic vector | List          |
+| 2d | Matrix        | Data frame    |
+| nd | Array         |               |
+
+## Quick Tour of Things You Need to Know
+
+### Data Types
+
+* Atomic vectors come in one of four types
+* `logical` (boolean). Values: `TRUE` | `FALSE`
+* `integer`
+* `double` (often called numeric)
+* `character`
+* Rare types:
+* `complex`
+* `raw`
+
+## Manipulating Data Structures
+
+### Subsetting Operators
+
+* To create a vector, use `c`: `c(1, 4, 1, 3)`
+* To create a list, use `list`: `list(1, 'hi', data.frame(1:10, letters[1:10]))`
+* To subset a vector or list, use the `[ ]`
+  - inside the brackets:
+    + positive integer vectors for indices you want
+    + negative integer vectors for indices you want to drop
+    + logical vectors for indices you want to keep/drop (TRUE/FALSE)
+    + character vectors for named vectors corresponding to which named elements you want to keep
+    + subsetting a list with a single square bracket always returns a list
++ To subset a list and get back just that element, use `[[ ]]`
+
+### Object Representation
+
++ To find the type of an object, use `class` (_higher level representation_)
++ To find how the object is stored in memory, use `typeof` (_lower level representation_)
++ Good time to do Lab 0!
+
+# Data Manipulation with the `dplyr` Package
+
+## Overview
+
+Rather than describing the nitty gritty details of writing R code, I'd like you to get started at immediately writing R code.
+
+As most of you are data scientists/data enthusiasts, I will showcase one of the most useful data manipulation packages in R, `dplyr`.
+At the end of this session, you will have learned:
+
+* How to manipulate data quickly with `dplyr` using a very intuitive _"grammar"_
+* How to use `dplyr` to perform common exploratory analysis data manipulation procedures
+* How to apply your own custom functions to group manipulations `dplyr` with `mutate()`, `summarise()` and `do()`
+* Connect to remote databases to work with larger than memory datasets
+
+## Why use dplyr?
+### The Grammar of Data Manipulation
+
+* `dplyr` is currently the [most downloaded package](https://www.rdocumentation.org/packages/dplyr/versions/0.5.0?) from CRAN
+* `dplyr` makes data manipulation easier by providing a few functions for the most common tasks and procedures
+* `dplyr` achieves remarkable speed-up gains by using a C++ backend
+* `dplyr` has multiple backends for working with data stored in various sources: SQLite, MySQL, bigquery, SQL Server, and many more
+* `dplyr` was inspired to give data manipulation a simple, cohesive grammar (similar philosophy to `ggplot` - grammar of graphics)
+* `dplyr` has inspired many new packages, which now adopt it's easy to understand syntax.
+* The recent packages `dplyrXdf` and `SparkR/sparklyr` brings much of the same functionality of `dplyr` to `XDF`s data and Spark `DataFrames`
+
+
+## Tidy Data and Happier Coding
+### Premature Optimization
+
+![](https://imgs.xkcd.com/comics/the_general_problem.png)
+
++ For a dats scientist, the most important parameter to optimize in a data science development cycle is YOUR time
++ It is therefore important to be able to write efficient code, quickly
++ Goals: writing fast code that is: portable, platform invariant, easy to understand, and easy to debug
+    - __Be serious about CReUse__!
+
+## Manipulation verbs
+
+`filter`
+
+:    select rows based on matching criteria
+
+`slice`
+
+:    select rows by number
+
+`select`
+
+:    select columns by column names
+
+`arrange`
+
+:    reorder rows by column values
+
+`mutate`
+
+:    add new variables based on transformations of existing variables
+
+`transmute`
+
+:    transform and drop other variables
+
+
+
+## Aggregation verbs
+
+`group_by`
+
+:    identify grouping variables for calculating groupwise summary statistics
+
+
+`count`
+
+:    count the number of records per group
+
+
+`summarise` | `summarize`
+
+:    calculate one or more summary functions per group, returning one row of results per group (or one for the entire dataset)
+
+## NYC Taxi Data
+### Data for Class
+
+* The data we will be examining in this module is dervided from the [NYC Taxi and Limousine Commission](http://www.nyc.gov/html/tlc/html/home/home.shtml)
+* Data contains taxi trips in NYC, and includes spatial features (pickup and dropoff neighborhoods), temporal features, and monetary features (fare and tip amounts)
+* The dataset for this module is saved as an _rds_ file in a public facing Azure storage blob
+* An _rds_ file is a compressed, serialized R object
+* Save an object to _rds_ by using the `saveRDS` function; read an _rds_ object with the `readRDS` object
+
+## Viewing Data
+### tibble
+
+* `dplyr` includes a wrapper called `tbl_df` that adds an additional class attribute onto `data.frames` that provides some better data manipulation aesthetics (there's now a dedicated package [`tibble`](www.github.com/hadley/tibble) for this wrapper and it's class)
+* Most noticeable differential between `tbl_df` and `data.frame`s is the console output: `tbl_df`s will only print what the current R console window can display
+* Can change the default setting for number of displayed columns by changing the options parameter: `options(dplyr.width = Inf)`
+
+
+
+
+```{r}
+#----------------------
+#Code cell 1
+#----------------------
+
+.libPaths(c(.libPaths(),'/anaconda/lib/R/library/'))
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, fig.align = 'center')
+```
+
+
+```{r}
+#----------------------
+# Code cell 2
+#----------------------
+
+# Source in All Necessary Libraries
+library(dplyr)
+library(stringr)
+library(broom)
+library(dplyrXdf)
+library(ggplot2)
+
+# Load Data
+taxi_url <- "http://alizaidi.blob.core.windows.net/training/taxi_df.rds"
+taxi_df  <- readRDS(gzcon(url(taxi_url)))
+(taxi_df <- tbl_df(taxi_df))
+```
+
+
+# Filtering and Reordering Data
+
+## Subsetting Data
+
+* `dplyr` makes subsetting by rows very easy
+* The `filter` verb takes conditions for filtering rows based on conditions
+* **every** `dplyr` function uses a data.frame/tbl as it's first argument
+* Additional conditions are passed as new arguments (no need to make an insanely complicated expression, split em up!)
+
+## Filter
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 3
+#----------------------
+
+filter(taxi_df,
+       dropoff_dow %in% c("Fri", "Sat", "Sun"),
+       tip_amount > 1)
+```
+
+
+## Exercise
+
+Your turn:
+
+* How many observations started in Harlem?
+  - pick both sides of Harlem, including east harlem
+* How many observations that started in Harlem ended in the Financial District?
+
+## Solution
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 4
+#----------------------
+
+table(taxi_df$pickup_nhood)
+harlem_pickups <- filter(taxi_df, str_detect(pickup_nhood, "Harlem"))
+harlem_pickups
+```
+
+
+
+```{r}
+#----------------------
+# Code cell 5
+#----------------------
+
+nrow(filter(harlem_pickups, dropoff_nhood=="Financial District"))
+```
+
+
+## Select a set of columns
+
+* You can use the `select()` verb to specify which columns of a dataset you want
+* This is similar to the `keep` option in SAS's data step.
+* Use a colon `:` to select all the columns between two variables (inclusive)
+* Use `contains` to take any columns containing a certain word/phrase/character
+
+## Select Example
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 6
+#----------------------
+
+select(taxi_df, pickup_nhood, dropoff_nhood,
+       fare_amount, dropoff_hour, trip_distance)
+```
+
+
+## Select: Other Options
+
+starts_with(x, ignore.case = FALSE)
+
+:    name starts with `x`
+
+ends_with(x, ignore.case = FALSE)
+
+:    name ends with `x`
+
+matches(x, ignore.case = FALSE)
+
+:    selects all variables whose name matches the regular expression `x`
+
+num_range("V", 1:5, width = 1)
+
+:    selects all variables (numerically) from `V1` to `V5`.
+
+* You can also use a `-` to drop variables.
+
+## Reordering Data
+
+* You can reorder your dataset based on conditions using the `arrange()` verb
+* Use the `desc` function to sort in descending order rather than ascending order (default)
+
+## Arrange
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 7
+#----------------------
+
+select(arrange(taxi_df, desc(fare_amount), pickup_nhood),
+       fare_amount, pickup_nhood)
+
+head(select(arrange(taxi_df, desc(fare_amount), pickup_nhood),
+       fare_amount, pickup_nhood), 10)
+```
+
+
+
+
+
+## Exercise
+Use `arrange()` to  sort on the basis of `tip_amount`, `dropoff_nhood`, and `pickup_dow`, with descending order for tip amount
+
+## Summary
+
+filter
+
+:    Extract subsets of rows. See also `slice()`
+
+select
+
+:    Extract subsets of columns. See also `rename()`
+
+arrange
+
+:    Sort your data
+
+# Data Aggregations and Transformations
+
+## Transformations
+
+* The `mutate()` verb can be used to make new columns
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 8
+#----------------------
+
+taxi_df <- mutate(taxi_df, tip_pct = tip_amount/fare_amount)
+select(taxi_df, tip_pct, fare_amount, tip_amount)
+#transmute(taxi_df, tip_pct = tip_amount/fare_amount)
+```
+
+
+## Summarise Data by Groups
+
+* The `group_by` verb creates a grouping by a categorical variable
+* Functions can be placed inside `summarise` to create summary functions
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 9 
+#----------------------
+
+grouped_taxi <- group_by(taxi_df, dropoff_nhood)
+class(grouped_taxi)
+grouped_taxi
+```
+
+
+```{r}
+#----------------------
+# Code cell 10
+#----------------------
+
+summarize(group_by(taxi_df, dropoff_nhood),
+          Num = n(), ave_tip_pct = mean(tip_pct))
+```
+
+
+## Group By Neighborhoods Example
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 11
+#----------------------
+
+summarise(group_by(taxi_df, pickup_nhood, dropoff_nhood),
+          Num = n(), ave_tip_pct = mean(tip_pct))
+```
+
+
+## Chaining/Piping
+
+* A `dplyr` installation includes the `magrittr` package as a dependency
+* The `magrittr` package includes a pipe operator that allows you to pass the current dataset to another function
+* This makes interpreting a nested sequence of operations much easier to understand
+
+## Standard Code
+
+* Code is executed inside-out.
+* Let's arrange the above average tips in descending order, and only look at the locations that had at least 10 dropoffs and pickups.
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 12
+#----------------------
+
+filter(arrange(summarise(group_by(taxi_df, pickup_nhood, dropoff_nhood), Num = n(), ave_tip_pct = mean(tip_pct)), desc(ave_tip_pct)), Num >= 10)
+```
+
+
+---
+
+![damn](http://www.ohmagif.com/wp-content/uploads/2015/01/lemme-go-out-for-a-walk-oh-no-shit.gif)
+
+## Reformatted
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 13
+#----------------------
+
+filter(
+  arrange(
+    summarise(
+      group_by(taxi_df,
+               pickup_nhood, dropoff_nhood),
+      Num = n(),
+      ave_tip_pct = mean(tip_pct)),
+    desc(ave_tip_pct)),
+  Num >= 10)
+```
+
+
+## Magrittr
+
+![](https://github.com/smbache/magrittr/raw/master/inst/logo.png)
+
+* Inspired by unix `|`, and F# forward pipe `|>`, `magrittr` introduces the funny character (`%>%`, the _then_ operator)
+* `%>%` pipes the object on the left hand side to the first argument of the function on the right hand side
+* Every function in `dplyr` has a slot for `data.frame/tbl` as it's first argument, so this works beautifully!
+
+## Put that Function in Your Pipe and...
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 15
+#----------------------
+
+taxi_df %>%
+  group_by(pickup_nhood, dropoff_nhood) %>%
+  summarize(Num = n(),
+            ave_tip_pct = mean(tip_pct)) %>%
+  arrange(desc(ave_tip_pct)) %>%
+  filter(Num >= 10)
+```
+
+
+---
+
+![hellyeah](http://i.giphy.com/lF1XZv45kIwMw.gif)
+
+## Pipe + group_by()
+
+* The pipe operator is very helpful for group by summaries
+* Let's calculate average tip amount, and average trip distance, controlling for dropoff day of the week and dropoff location
+* First filter with the vector `manhattan_hoods`
+
+---
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 16
+#----------------------
+
+mht_url <- "http://alizaidi.blob.core.windows.net/training/manhattan.rds"
+manhattan_hoods <- readRDS(gzcon(url(mht_url)))
+taxi_df %>%
+  filter(pickup_nhood %in% manhattan_hoods,
+         dropoff_nhood %in% manhattan_hoods) %>%
+  group_by(dropoff_nhood, pickup_nhood) %>%
+  summarize(ave_tip = mean(tip_pct),
+            ave_dist = mean(trip_distance)) %>%
+  filter(ave_dist > 3, ave_tip > 0.05)
+```
+
+
+## Pipe and Plot
+
+Piping is not limited to dplyr functions, can be used everywhere!
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 17
+#----------------------
+
+taxi_df %>%
+  filter(pickup_nhood %in% manhattan_hoods,
+         dropoff_nhood %in% manhattan_hoods) %>%
+  group_by(dropoff_nhood, pickup_nhood) %>%
+  summarize(ave_tip = mean(tip_pct),
+            ave_dist = mean(trip_distance)) %>%
+  filter(ave_dist > 3, ave_tip > 0.05) %>%
+  ggplot(aes(x = pickup_nhood, y = dropoff_nhood)) +
+    geom_tile(aes(fill = ave_tip), colour = "white") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = 'bottom') +
+    scale_fill_gradient(low = "white", high = "steelblue")
+
+```
+
+
+
+## Piping to other arguments
+
+* Although `dplyr` takes great care to make it particularly amenable to piping, other functions may not reserve the first argument to the object you are passing into it.
+* You can use the special `.` placeholder to specify where the object should enter
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 18
+#----------------------
+
+taxi_df %>%
+  filter(pickup_nhood %in% manhattan_hoods,
+         dropoff_nhood %in% manhattan_hoods) %>%
+  group_by(dropoff_nhood, pickup_nhood) %>%
+  summarize(ave_tip = mean(tip_pct),
+            ave_dist = mean(trip_distance)) %>%
+  lm(ave_tip ~ ave_dist, data = .) -> taxi_model
+summary(taxi_model)
+```
+
+
+## Exercise
+
+Your turn:
+
+* Use the pipe operator to group by day of week and dropoff neighborhood
+* Filter to Manhattan neighborhoods
+* Make tile plot with average fare amount in dollars as the fill
+
+# Functional Programming
+
+## Creating Functional Pipelines
+### Too Many Pipes?
+
+![whoaaaaaaaaahhhhh](http://www.ohmagif.com/wp-content/uploads/2015/02/the-scariest-electrical-repair-ever.gif)
+
+---
+
+### Reusable code
+
+* The examples above create a rather messy pipeline operation
+* Can be very hard to debug
+* The operation is pretty readable, but lacks reusability
+* Since R is a functional language, we benefit by splitting these operations into functions and calling them separately
+* This allows resuability; don't write the same code twice!
+
+## Functional Pipelines
+### Summarization
+
+* Let's create a function that takes an argument for the data, and applies the summarization by neighborhood to calculate average tip and trip distance
+
+---
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 19
+#----------------------
+
+taxi_hood_sum <- function(taxi_data = taxi_df) {
+
+  mht_url <- "http://alizaidi.blob.core.windows.net/training/manhattan.rds"
+
+  manhattan_hoods <- readRDS(gzcon(url(mht_url)))
+  taxi_data %>%
+    filter(pickup_nhood %in% manhattan_hoods,
+           dropoff_nhood %in% manhattan_hoods) %>%
+    group_by(dropoff_nhood, pickup_nhood) %>%
+    summarize(ave_tip = mean(tip_pct),
+              ave_dist = mean(trip_distance)) %>%
+    filter(ave_dist > 3, ave_tip > 0.05) -> sum_df
+
+  return(sum_df)
+
+}
+
+```
+
+
+## Functional Pipelines
+
+### Plotting Function
+
+* We can create a second function for the plot
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 20
+#----------------------
+
+tile_plot_hood <- function(df = taxi_hood_sum()) {
+
+
+  ggplot(data = df, aes(x = pickup_nhood, y = dropoff_nhood)) +
+    geom_tile(aes(fill = ave_tip), colour = "white") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = 'bottom') +
+    scale_fill_gradient(low = "white", high = "steelblue") -> gplot
+
+  return(gplot)
+}
+
+```
+
+
+## Calling Our Pipeline
+
+* Now we can create our plot by simply calling our two functions
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 21
+#----------------------
+
+taxi_hood_sum(taxi_df) %>% tile_plot_hood 
+```
+
+
+Let's make that baby interactive.
+
+## Creating Complex Pipelines with do
+
+* The `summarize` function is fun, can summarize many numeric/scalar quantities
+* But what if you want multiple values/rows back, not just a scalar summary?
+* Meet the `do` verb -- arbitrary `tbl` operations
+
+---
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 22
+#----------------------
+
+taxi_df %>% group_by(dropoff_dow) %>%
+  filter(!is.na(dropoff_nhood), !is.na(pickup_nhood)) %>%
+  arrange(desc(tip_pct)) %>%
+  do(slice(., 1:2)) %>%
+  select(dropoff_dow, tip_amount, tip_pct,
+         fare_amount, dropoff_nhood, pickup_nhood)
+```
+
+
+## Estimating Multiple Models with do
+
+* A common use of `do` is to calculate many different models by a grouping variable
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 23
+#----------------------
+
+dow_lms <- taxi_df %>% sample_n(10^4) %>%
+  group_by(dropoff_dow) %>%
+  do(lm_tip = lm(tip_pct ~ pickup_nhood + passenger_count + pickup_hour,
+     data = .))
+```
+
+
+---
+
+
+
+
+
+```{r}
+#dow_lms
+```
+
+
+
+Where are our results?
+![digging](http://i.giphy.com/oEnTTI3ZdK6ic.gif)
+
+## Cleaning Output
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 24
+#----------------------
+
+summary(dow_lms$lm_tip[[1]])
+dow_lms %>% tidy(lm_tip)
+```
+
+
+
+* By design, every function in `dplyr` returns a `data.frame`
+* In the example above, we get back a spooky `data.frame` with a column of `S3` `lm` objects
+* You can still modify each element as you would normally, or pass it to a `mutate` function to extract intercept or statistics
+* But there's also a very handy `broom` package for cleaning up such objects into `data.frames`
+
+## Brooming Up the Mess
+
+### Model Metrics
+
+
+
+
+```{r}
+#----------------------
+# Code cell 25
+#----------------------
+
+taxi_df %>% sample_n(10^5) %>%
+  group_by(dropoff_dow) %>%
+  do(glance(lm(tip_pct ~ pickup_nhood + passenger_count + pickup_hour,
+     data = .)))
+
+```
+
+
+### Model Coefficients
+
+The most commonly used function in the `broom` package is the `tidy` function. This will expand our data.frame and give us the model coefficients
+
+
+
+
+
+```{r}
+#----------------------
+# Code cell 26
+#----------------------
+
+taxi_df %>% sample_n(10^5) %>%
+  group_by(dropoff_dow) %>%
+  do(tidy(lm(tip_pct ~ pickup_nhood + passenger_count + pickup_hour,
+     data = .)))
+```
+
+
+
+## Summary
+
+mutate
+
+:    Create transformations
+
+summarise
+
+:    Aggregate
+
+group_by
+
+:    Group your dataset by levels
+
+do
+
+:    Evaluate complex operations on a tbl
+
+Chaining with the `%>%` operator can result in more readable code.
+
+## What We Didn't Cover
+
+* There are many additional topics that fit well into the `dplyr` and functional programming landscape
+* There are too many to cover in one session. Fortunately, most are well documented. The most notable omissions:
+  1. Connecting to remote databases, see `vignette('databases', package = 'dplyr')`
+  2. Merging and Joins, see `vignette('two-table', package = 'dplyr')`
+  3. Programming with `dplyr`,`vignette('nse', package = 'dplyr')`
+  4. `summarize_each` and `mutate_each`
+
+## Thanks for Attending!
+
+- Any questions?
+

@@ -1,0 +1,649 @@
+
+
+
+# In this module...
+
+- We will learn how to train and test models with the `RevoScaleR` package.
+- Use your knowledge of data manipulation to create **train** and **test** sets.
+- Use the modeling functions in `RevoScaleR` to train a model.
+- Use the `rxPredict` function to test/score a model.
+- We will see how you can score models on a variety of data sources.
+- Use a functional methodology, i.e., we will create functions to automate the modeling, validation, and scoring process.
+
+## Prerequisites
+
+- Understanding of `rxDataStep` and `xdfs`
+- Familiarity with `RevoScaleR` modeling and datastep functions: `rxLinMod`, `rxGlm`, `rxLogit`, `rxDTree`, `rxDForest`, `rxSplit`, and `rxPredict`
+- Understand how to write functions in R
+- Access to at least one interesting dataset
+
+## Typical Lifecycle
+
+![](http://oliviak.blob.core.windows.net/blog/ML%20series/6%203%20mkt%201.png)
+
+### For this module we will...
+
+- Start with a data set
+- Split the data into separate training and validation/evaluation data sets
+- Use the `ScaleR` modeling functions on the train set to estimate your model
+- Use `rxPredict` to score then evaluate the model you built.
+
+## Mortgage Dataset
+
+- We will work with a mortgage dataset, which contains mortgage and credit profiles for various mortgage holders
+
+
+
+
+```{r}
+#----------------------
+# Code cell 1
+#----------------------
+
+mort_path <- paste(rxGetOption("sampleDataDir"), "mortDefaultSmall.xdf", sep = "/")
+file.copy(mort_path, "mortgage.xdf", overwrite = TRUE)
+mort_xdf <- RxXdfData("mortgage.xdf")
+rxGetInfo(mort_xdf, getVarInfo = TRUE, numRows = 5)
+```
+
+
+## Transform Default to Categorical
+
+- We might be interested in estimating a classification model for predicting defaults based on credit attributes
+
+
+
+```{r}
+#----------------------
+# Code cell 2
+#----------------------
+
+rxDataStep(inData = mort_xdf,
+           outFile = mort_xdf,
+           overwrite = TRUE,
+           transforms = list(default_flag = factor(ifelse(default == 1,
+                                                          "default",
+                                                          "current"))
+                             )
+           )
+rxGetInfo(mort_xdf, numRows = 3, getVarInfo = TRUE)
+```
+
+
+
+# Modeling
+## Generating Training and Test Sets
+
+- The first step to estimating a model is having a tidy training dataset.
+- We will work with the mortgage data and use `rxSplit` to create partitions.
+- `rxSplit` splits an input `.xdf` into multiple `.xdfs`, similar in spirit to the `split` function in base R
+- output is a list
+- First step is to create a split variable
+- We will randomly partition the data into a train and test sample, with 75% in the former, and 25% in the latter
+
+## Partition Function
+
+
+
+
+```{r}
+#----------------------
+# Code cell 3
+#----------------------
+
+create_partition <- function(xdf = mort_xdf,
+                             partition_size = 0.75, ...) {
+  rxDataStep(inData = xdf,
+             outFile = xdf,
+             transforms = list(
+               trainvalidate = factor(
+                   ifelse(rbinom(.rxNumRows,
+                                 size = 1, prob = splitperc),
+                          "train", "validate")
+               )
+           ),
+           transformObjects = list(splitperc = partition_size),
+           overwrite = TRUE, ...)
+
+  splitDS <- rxSplit(inData = xdf,
+                     #outFilesBase = ,
+                     outFileSuffixes = c("train", "validate"),
+                     splitByFactor = "trainvalidate",
+                     overwrite = TRUE)
+
+  return(splitDS)
+
+}
+
+```
+
+
+## Minimizing IO
+### Transforms in rxSplit
+
+While the above example does what we want it to do, it's not very efficient. It requires two passes over the data, first to add the `trainvalidate` column, and then another to split it into train and validate sets. We could do all of that in a single step if we pass the transforms directly to `rxSplit`.
+
+
+
+```{r}
+#----------------------
+# Code cell 4
+#----------------------
+
+create_partition <- function(xdf = mort_xdf,
+                             partition_size = 0.75, ...) {
+
+  splitDS <- rxSplit(inData = xdf,
+                     transforms = list(
+                       trainvalidate = factor(
+                         ifelse(rbinom(.rxNumRows,
+                                       size = 1, prob = splitperc),
+                                "train", "validate")
+                         )
+                       ),
+                     transformObjects = list(splitperc = partition_size),
+                     outFileSuffixes = c("train", "validate"),
+                     splitByFactor = "trainvalidate",
+                     overwrite = TRUE)
+
+  return(splitDS)
+
+}
+
+```
+
+
+
+## Generating Training and Test Sets
+### List of xdfs
+
+- The `create_partition` function will output a list `xdfs`
+
+
+
+
+```{r}
+#----------------------
+# Code cell 5
+#----------------------
+
+mort_split <- create_partition(reportProgress = 0)
+names(mort_split) <- c("train", "validate")
+lapply(mort_split, rxGetInfo)
+```
+
+
+
+## Build Your Model
+### Model Formula
+
+- Once you have a training dataset, the most appropriate next step is to estimate your model
+- `RevoScaleR` provides a plethora of modeling functions to choose from: decision trees, ensemble trees, linear models, and generalized linear models
+- All take a formula as the first object in their call
+
+
+
+```{r}
+#----------------------
+# Code cell 6
+#----------------------
+
+make_form <- function(xdf = mort_xdf,
+                      resp_var = "default_flag",
+                      vars_to_skip = c("default", "trainvalidate")) {
+
+  library(stringr)
+
+  non_incl <- paste(vars_to_skip, collapse = "|")
+
+  x_names <- names(xdf)
+
+  features <- x_names[!str_detect(x_names, resp_var)]
+  features <- features[!str_detect(features, non_incl)]
+
+  form <- as.formula(paste(resp_var, paste0(features, collapse = " + "),
+                           sep  = " ~ "))
+
+  return(form)
+}
+
+## Turns out, RevoScaleR already has a function for this
+formula(mort_xdf, depVar = "default_flag", varsToDrop = c("default", "trainvalidate"))
+
+
+```
+
+
+## Build Your Model
+### Modeling Function
+
+- Use the `make_form` function inside your favorite `rx` modeling function
+- Default value will be a logistic regression, but can update the `model` parameter to any `rx` modeling function
+
+
+
+
+```{r}
+#----------------------
+# Code cell 7
+#----------------------
+
+make_form()
+
+estimate_model <- function(xdf_data = mort_split[["train"]],
+                           form = make_form(xdf_data),
+                           model = rxLogit, ...) {
+
+  rx_model <- model(form, data = xdf_data, ...)
+
+  return(rx_model)
+
+
+}
+
+```
+
+
+## Build Your Model
+### Train Your Model with Our Modeling Function
+
+- Let us now train our logistic regression model for defaults using the `estimate_model` function from the last slide
+
+
+
+
+```{r}
+#----------------------
+# Code cell 8
+#----------------------
+
+default_model_logit <- estimate_model(mort_split$train,
+                                      reportProgress = 0)
+summary(default_model_logit)
+
+```
+
+
+
+## Building Additional Models
+
+- We can change the parameters of the `estimate_model` function to create a different model relatively quickly
+
+
+
+
+```{r}
+#----------------------
+# Code cell 9
+#----------------------
+
+default_model_tree <- estimate_model(mort_split$train,
+                                     model = rxDTree,
+                                     minBucket = 10,
+                                     reportProgress = 0)
+summary(default_model_tree)
+library(RevoTreeView)
+plot(createTreeView(default_model_tree))
+
+```
+
+
+
+# Validation
+## How Does it Perform on Unseen Data
+### rxPredict for Logistic Regression
+
+
+
+
+```{r}
+#----------------------
+# Code cell 10
+#----------------------
+
+options(stringsAsFactors = TRUE)
+if(file.exists("scored.xdf")) file.remove('scored.xdf')
+```
+
+
+- Now that we have built our model, our next step is to see how it performs on data it has yet to see
+- We can use the `rxPredict` function to score/validate our results
+
+
+
+```{r}
+#----------------------
+# Code cell 11
+#----------------------
+
+default_logit_scored <- rxPredict(default_model_logit,
+                                   mort_split$validate,
+                                   "scored.xdf",
+                                  writeModelVars = TRUE,
+                                  extraVarsToWrite = "default",
+                                  predVarNames = c("pred_logit_default"))
+rxGetInfo(default_logit_scored, numRows = 15)
+```
+
+
+
+## Visualize Model Results
+
+
+
+
+```{r}
+#----------------------
+# Code cell 12
+#----------------------
+
+plot(rxRoc(actualVarName = "default",
+      predVarNames ="pred_logit_default",
+      data = default_logit_scored))
+```
+
+
+
+## Testing a Second Model
+### rxPredict for Decision Tree
+
+- We saw how easy it was to train on different in the previous sections
+- Similary simple to test different models
+
+
+
+
+```{r}
+#----------------------
+# Code cell 13
+#----------------------
+
+default_tree_scored <- rxPredict(default_model_tree,
+                                  mort_split$validate,
+                                  "scored.xdf",
+                                  writeModelVars = TRUE,
+                                 predVarNames = c("pred_tree_current",
+                                                  "pred_tree_default"))
+
+```
+
+
+## Visualize Multiple ROCs
+
+
+
+
+```{r}
+#----------------------
+# Code cell 14
+#----------------------
+
+rxRocCurve("default",
+           c("pred_logit_default", "pred_tree_default"),
+           data = default_tree_scored)
+
+```
+
+
+# Lab - Estimate Other Models Using the Functions Above
+
+## Ensemble Tree Algorithms
+
+Two of the most predictive algorithms in the `RevoScaleR` package are the `rxBTrees` and `rxDForest` algorithms, for gradient boosted decision trees and random forests, respectively.
+
+Use the above functions and estimate a model for each of those algorithms, and add them to the `default_tree_scored` dataset to visualize ROC and AUC metrics.
+
+
+
+
+```{r}
+#----------------------
+# Code cell 15
+#----------------------
+
+## Starter code
+
+default_model_forest <- estimate_model(mort_split$train,
+                                       model = rxDForest,
+                                       nTree = 100,
+                                       importance = TRUE,
+                                       ### any other args?,
+                                       reportProgress = 0)
+
+default_forest_scored <- rxPredict(default_model_forest,
+                                  mort_split$validate,
+                                 "scored.xdf",
+                                 type = 'prob',
+                                 predVarNames = c("pred_forest_current", "pred_forest_default", "pred_default"))
+
+
+
+```
+
+
+```{r}
+#----------------------
+# Code cell 16
+#----------------------
+
+## same for rxBTrees
+
+default_model_gbm <- estimate_model(mort_split$train,
+                                    model = rxBTrees,
+                                    nTree = 100,
+                                    ### any other args?,
+                                    reportProgress = 0)
+
+default_gbm_scored <- rxPredict(default_model_gbm,
+                                 mort_split$validate,
+                                "scored.xdf",
+                               predVarNames = c("pred_gbm_default"))
+
+
+```
+
+
+```{r}
+#----------------------
+# Code cell 17
+#----------------------
+
+ rxRocCurve(actualVarName = "default",
+            predVarNames = c("pred_tree_default",
+                             "pred_logit_default",
+                             "pred_forest_default",
+                             "pred_gbm_default"),
+            data = 'scored.xdf')
+```
+
+
+
+
+# More Advanced Topics
+
+## Scoring on Non-XDF Data Sources
+### Using a CSV as a Data Source
+
+- The previous slides focused on using xdf data sources
+- Most of the `rx` functions will work on non-xdf data sources
+- For training, which is often an iterative process, it is recommended to use xdfs
+- For scoring/testing, which requires just one pass through the data, feel free to use raw data!
+
+
+
+
+```{r}
+#----------------------
+# Code cell 18
+#----------------------
+
+csv_path <- paste(rxGetOption("sampleDataDir"),
+                   "mortDefaultSmall2009.csv",
+                   sep = "/")
+file.copy(csv_path, "mortDefaultSmall2009.csv", overwrite = TRUE)
+
+mort_csv <- RxTextData("mortDefaultSmall2009.csv")
+
+```
+
+
+## Regression Tree
+
+- For a slightly different model, we will estimate a regression tree.
+- Just change the parameters in the `estimate_model` function
+
+
+
+```{r}
+#----------------------
+# Code cell 19
+#----------------------
+
+tree_model_ccdebt <- estimate_model(xdf_data = mort_split$train,
+                                    form = make_form(mort_split$train,
+                                                     "ccDebt",
+                                                     vars_to_skip = c("default_flag",
+                                                                      "trainvalidate")),
+                                    model = rxDTree)
+
+# plot(RevoTreeView::createTreeView(tree_model_ccdebt))
+
+```
+
+
+
+## Test on CSV
+
+
+
+```{r}
+#----------------------
+# Code cell 20
+#----------------------
+
+if (file.exists("mort2009predictions.xdf")) file.remove("mort2009predictions.xdf")
+```
+
+
+````{r}
+#----------------------
+# Code cell 21
+#----------------------
+
+rxPredict(tree_model_ccdebt,
+          data = mort_csv,
+          outData = "mort2009predictions.xdf",
+          writeModelVars = TRUE)
+
+mort_2009_pred <- RxXdfData("mort2009predictions.xdf")
+rxGetInfo(mort_2009_pred, numRows = 5)
+
+
+```
+
+```{r}
+#----------------------
+# Code cell 22
+#----------------------
+
+mort_xdf_factor <- rxFactors(inData = mort_xdf,
+                             factorInfo = c("year"),
+                             outFile = "mort_year.xdf",
+                             overwrite = TRUE)
+
+
+```
+
+
+# Multiclass Classification
+## Convert Year to Factor
+
+- We have seen how to estimate a binary classification model and a regression tree
+- How would we estimate a multiclass classification model?
+- Let's try to predict mortgage origination based on other variables
+- Use `rxFactors` to convert *year* to a _factor_ variable
+
+
+
+
+## Convert Year to Factor
+
+
+
+```{r}
+#----------------------
+# Code cell 23
+#----------------------
+
+rxGetInfo(mort_xdf_factor, getVarInfo = TRUE, numRows = 4)
+```
+
+
+## Estimate Multiclass Classification
+
+- You know the drill! Change the parameters in `estimate_model`:
+
+
+
+```{r}
+#----------------------
+# Code cell 24
+#----------------------
+
+tree_multiclass_year <- estimate_model(xdf_data = mort_xdf_factor,
+                                    form = make_form(mort_xdf_factor,
+                                                     "year",
+                                                     vars_to_skip = c("default",
+                                                                      "trainvalidate")),
+                                    model = rxDTree)
+
+
+```
+
+
+## Predict Multiclass Classification
+
+- Score the results
+
+
+
+
+```{r}
+#----------------------
+# Code cell 25
+#----------------------
+
+multiclass_preds <- rxPredict(tree_multiclass_year,
+                              data = mort_xdf_factor,
+                              writeModelVars = TRUE,
+                              outData = "multi.xdf",
+                              overwrite = TRUE)
+
+```
+
+
+## Predict Multiclass Classification
+
+- View the results
+- Predicted/scored column for each level of the response
+- Sum up to one
+
+
+
+```{r}
+#----------------------
+# Code cell 26
+#----------------------
+
+rxGetInfo(multiclass_preds, numRows = 5)
+```
+
+
+
+## Conclusion
+### Thanks for Attending!
+
+- Any questions?
+- Try different models!
+- Try modeling with `rxDForest`, `rxBTrees`: have significantly higher predictive accuracy, somewhat less interpretability
+
