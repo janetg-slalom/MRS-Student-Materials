@@ -5,7 +5,7 @@ Welcome to the Slalom Microsoft R Server Course Repository. While this course is
 
 ## Course Outline
 
-Please refer to the [course syllabus](https://github.com/janetg-slalom/MRS-Student-Resources/wiki/Syllabus) for the full syllabus. The goal of this course is to cover the following modules, although some of the latter modules may be repalced for a hackathon/office hours.
+Please refer to the [course syllabus](https://github.com/janetg-slalom/MRS-Student-Materials/wiki/Syllabus) for the full syllabus. The goal of this course is to cover the following modules, although some of the latter modules may be repalced for a hackathon/office hours.
 
 + Topics:
     * R Fundamentals
@@ -17,7 +17,7 @@ Please refer to the [course syllabus](https://github.com/janetg-slalom/MRS-Stude
 
 ## DSVMs
 
-We will use iPython Notebooks (via Jupyter) on DSVMs (Data Science Virtual Machines) from the Azure marketplace to run the course materials. We will be providing only a brief overview of HDInsights (Hadoop & Spark); we expect to offer this material in a different course. If you are interested in running course materials locally, see the course [wiki](https://github.com/janetg-slalom/MRS-Student-Resources/wiki/Running-R-Server-locally-with-R-Client) for instructions. 
+We will use iPython Notebooks (via Jupyter) on DSVMs (Data Science Virtual Machines) from the Azure marketplace to run the course materials. We will be providing only a brief overview of HDInsights (Hadoop & Spark); we expect to offer this material in a different course. If you are interested in running course materials locally, see the course [wiki](https://github.com/janetg-slalom/MRS-Student-Materials/wiki/Running-R-Server-locally-with-R-Client) for instructions. 
    
 ## RStudio
 RStudio, the most population R IDE, is not installed on the DSVM.  All course material will be provided in R script files as well as iPython Notebooks.  If you perfer to use R Studio locally you must install R Server locally.
