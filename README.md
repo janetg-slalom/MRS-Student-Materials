@@ -20,7 +20,7 @@ Please refer to the [course syllabus](https://github.com/janetg-slalom/MRS-Stude
 We will use iPython notebooks (via Jupyter) on DSVMs [Data Science Virtual Machines](https://docs.microsoft.com/en-us/azure/machine-learning/machine-learning-data-science-provision-vm) from the Azure marketplace to run the course materials. We will be providing only a brief overview of HDInsights (Hadoop & Spark); we expect to offer this material in a different course. If you are interested in running course materials locally, see the course [wiki](https://github.com/janetg-slalom/MRS-Student-Materials/wiki/Running-R-Server-Locally) for instructions. 
    
 ## RStudio
-RStudio, the most popular R IDE, R Studio Server is installed on the VMs, though we will be using iPython notebooks to deliver the course.  All course material are provided in R markdown files as well.  
+RStudio it the most popular R IDE is installed on the VMs as well as R Studio Server (web client). We will be using iPython notebooks to deliver the course however, all course material are provided in R markdown files as well. 
 
 ### Credentials
 
