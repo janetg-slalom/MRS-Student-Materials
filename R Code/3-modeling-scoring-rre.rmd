@@ -35,7 +35,7 @@
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 1
 #----------------------
@@ -53,7 +53,8 @@ rxGetInfo(mort_xdf, getVarInfo = TRUE, numRows = 5)
 
 
 
-```{r}
+
+```R
 #----------------------
 # Code cell 2
 #----------------------
@@ -86,7 +87,7 @@ rxGetInfo(mort_xdf, numRows = 3, getVarInfo = TRUE)
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 3
 #----------------------
@@ -125,7 +126,8 @@ While the above example does what we want it to do, it's not very efficient. It 
 
 
 
-```{r}
+
+```R
 #----------------------
 # Code cell 4
 #----------------------
@@ -162,7 +164,7 @@ create_partition <- function(xdf = mort_xdf,
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 5
 #----------------------
@@ -183,7 +185,8 @@ lapply(mort_split, rxGetInfo)
 
 
 
-```{r}
+
+```R
 #----------------------
 # Code cell 6
 #----------------------
@@ -223,7 +226,7 @@ formula(mort_xdf, depVar = "default_flag", varsToDrop = c("default", "trainvalid
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 7
 #----------------------
@@ -252,7 +255,7 @@ estimate_model <- function(xdf_data = mort_split[["train"]],
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 8
 #----------------------
@@ -272,7 +275,7 @@ summary(default_model_logit)
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 9
 #----------------------
@@ -296,7 +299,7 @@ plot(createTreeView(default_model_tree))
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 10
 #----------------------
@@ -311,7 +314,8 @@ if(file.exists("scored.xdf")) file.remove('scored.xdf')
 
 
 
-```{r}
+
+```R
 #----------------------
 # Code cell 11
 #----------------------
@@ -332,7 +336,7 @@ rxGetInfo(default_logit_scored, numRows = 15)
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 12
 #----------------------
@@ -353,7 +357,7 @@ plot(rxRoc(actualVarName = "default",
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 13
 #----------------------
@@ -373,7 +377,7 @@ default_tree_scored <- rxPredict(default_model_tree,
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 14
 #----------------------
@@ -396,7 +400,7 @@ Use the above functions and estimate a model for each of those algorithms, and a
 
 
 
-```{r}
+```R
 #----------------------
 # Code cell 15
 #----------------------
@@ -421,7 +425,7 @@ default_forest_scored <- rxPredict(default_model_forest,
 ```
 
 
-```{r}
+```R
 #----------------------
 # Code cell 16
 #----------------------
@@ -443,7 +447,7 @@ default_gbm_scored <- rxPredict(default_model_gbm,
 ```
 
 
-```{r}
+```R
 #----------------------
 # Code cell 17
 #----------------------
@@ -454,6 +458,108 @@ default_gbm_scored <- rxPredict(default_model_gbm,
                              "pred_forest_default",
                              "pred_gbm_default"),
             data = 'scored.xdf')
+```
+
+
+
+# Deploy (publish) your model to Azure ML as a Web Service
+ You'll need the AzureML package as well as an Azure ML account.
+### Log into your [Azure ML account](https://studio.azureml.net) and copy your _workspace id_ and _primary authorization token_ under Settings.
+
+The general steps are...
+
+-  Convert the ScaleR model to it's open source R equivalent
+-  define the format of the new data to be scored
+-  create a scoring function to publish
+-  get AzureML workspace ID and token authorization key
+-  publish the model
+
+
+
+```R
+#----------------------
+# Code cell 18
+#----------------------
+
+library(AzureML)
+library(gbm)
+
+#Convert RevoScaleR model to Open R equivalent
+gbm_publish<-as.gbm(default_model_gbm)
+
+#convert xdf to df to test model conversion and scoring
+newdata_df<-rxDataStep(inData=mort_split$validate, 
+                       varsToKeep=c("creditScore","houseAge","yearsEmploy","ccDebt" ,"year"))
+
+ls()
+```
+
+
+```R
+#----------------------
+# Code cell 19
+#----------------------
+
+#Test scoring function
+testpredict<-predict(gbm_publish, newdata_df, n.trees=10, type="response")
+head(testpredict, n=5)
+```
+
+
+
+_Note_: when creating the scoring function, you have to include any required packages.
+
+
+
+
+
+```R
+#----------------------
+# Code cell 20
+#----------------------
+
+#--Create schema for new data being scored
+inputscheme<-newdata_df[1,]
+
+#--Create scoring function 
+
+deploygbm<-function (newdata)
+{  
+  require(gbm)
+  predict(gbm_publish, newdata_df, n.trees=10, type="response")
+ 
+}
+
+
+```
+
+
+
+Define AzureML workspace which will house the web service and publish your model.
+
+
+
+
+
+```R
+#----------------------
+# Code cell 21
+#----------------------
+
+#--Set workspace parameters
+
+wsID= 'YOUR AZURE ML Workspace ID here'
+wsAuth = 'YOUR AZURE ML Primary Authorization Token here'
+
+wsDefinition=workspace(wsID, wsAuth)
+
+#--Publish web service to AzureML
+DeployGBM_demo <-publishWebService(wsDefinition
+                                    ,fun=deploygbm
+                                    ,name="DeployGBM_demo"
+                                    ,inputSchema =inputscheme)
+ls() 
+
 ```
 
 
@@ -472,9 +578,9 @@ default_gbm_scored <- rxPredict(default_model_gbm,
 
 
 
-```{r}
+```R
 #----------------------
-# Code cell 18
+# Code cell 22
 #----------------------
 
 csv_path <- paste(rxGetOption("sampleDataDir"),
@@ -494,9 +600,10 @@ mort_csv <- RxTextData("mortDefaultSmall2009.csv")
 
 
 
-```{r}
+
+```R
 #----------------------
-# Code cell 19
+# Code cell 23
 #----------------------
 
 tree_model_ccdebt <- estimate_model(xdf_data = mort_split$train,
@@ -516,18 +623,19 @@ tree_model_ccdebt <- estimate_model(xdf_data = mort_split$train,
 
 
 
-```{r}
+
+```R
 #----------------------
-# Code cell 20
+# Code cell 24
 #----------------------
 
 if (file.exists("mort2009predictions.xdf")) file.remove("mort2009predictions.xdf")
 ```
 
 
-````{r}
+```R
 #----------------------
-# Code cell 21
+# Code cell 25
 #----------------------
 
 rxPredict(tree_model_ccdebt,
@@ -541,9 +649,10 @@ rxGetInfo(mort_2009_pred, numRows = 5)
 
 ```
 
-```{r}
+
+```R
 #----------------------
-# Code cell 22
+# Code cell 26
 #----------------------
 
 mort_xdf_factor <- rxFactors(inData = mort_xdf,
@@ -570,9 +679,9 @@ mort_xdf_factor <- rxFactors(inData = mort_xdf,
 
 
 
-```{r}
+```R
 #----------------------
-# Code cell 23
+# Code cell 27
 #----------------------
 
 rxGetInfo(mort_xdf_factor, getVarInfo = TRUE, numRows = 4)
@@ -585,9 +694,10 @@ rxGetInfo(mort_xdf_factor, getVarInfo = TRUE, numRows = 4)
 
 
 
-```{r}
+
+```R
 #----------------------
-# Code cell 24
+# Code cell 28
 #----------------------
 
 tree_multiclass_year <- estimate_model(xdf_data = mort_xdf_factor,
@@ -608,9 +718,9 @@ tree_multiclass_year <- estimate_model(xdf_data = mort_xdf_factor,
 
 
 
-```{r}
+```R
 #----------------------
-# Code cell 25
+# Code cell 29
 #----------------------
 
 multiclass_preds <- rxPredict(tree_multiclass_year,
@@ -630,9 +740,9 @@ multiclass_preds <- rxPredict(tree_multiclass_year,
 
 
 
-```{r}
+```R
 #----------------------
-# Code cell 26
+# Code cell 30
 #----------------------
 
 rxGetInfo(multiclass_preds, numRows = 5)
