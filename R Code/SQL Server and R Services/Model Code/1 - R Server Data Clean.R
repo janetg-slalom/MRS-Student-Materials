@@ -11,7 +11,7 @@
 # --------------------
 # 
 #Date: March 2017
-#Author: Dan Tetrick
+#Author: Dan Tetrick, Slalom Consulting
 #
 #
 # Set Options
