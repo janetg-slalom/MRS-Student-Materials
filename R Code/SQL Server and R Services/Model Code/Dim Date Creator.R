@@ -1,3 +1,13 @@
+##########################################################
+#Description:
+#-----------------------
+# Function used to create a vector of dates to
+# store as a dimension table and used
+# in the foresting demo
+#-----------------------
+# Date: March 2017
+# Author: Dan Tetrick, Slalom Consulting
+##########################################################
 Dim_Date_Creator <- function(MinDate = "1900-01-01", MaxDate = "2099-12-31"){
    
   library(lubridate);library(dplyr)
