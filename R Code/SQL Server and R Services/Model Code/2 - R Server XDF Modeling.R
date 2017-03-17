@@ -1,26 +1,41 @@
+#Description:
+# --------------------
+# This second script demonstrates how to
+# create and Xdf file and using ScaleR functions (Microsoft R Server)
+# to create linear projects for each pollutant, NO2, SO2, O3, CO
+# 
+#--------------------
+#Date: March 2017
+#Author: Dan Tetrick
+#
+#
+
 # Set Options
-options(stringsAsFactors = F)
-options(scipen = 999)
+ options(stringsAsFactors = F)
+ options(scipen = 999)
 
-# Select Packages to Load
-pkgs <- c("readr", "lubridate", "corrplot", "tidyr","stringr","lattice",
-          "RevoScaleR","RevoMods", "dplyr","dplyrXdf")
+# # Select Packages to Load
+ pkgs <- c("readr", "lubridate", "corrplot", "tidyr","stringr","lattice",
+           "RevoScaleR","RevoMods", "dplyr","dplyrXdf")
 
-# Load Libraries and Source Codes
-sapply(pkgs, require, character.only = T)
+# # Load Libraries and Source Codes
+ sapply(pkgs, require, character.only = T)
 
-# Set Paths 
-Main_Path <- "<SQL Server and R Services folder path>"
-Results_Path <- paste0(Main_Path,"Results/")
-Input_Path <- paste0(Main_Path,"Input Data/")
-Model_Code <- paste0(Main_Path,"Model Code/")
+ # Set Paths
+ Main_Path <- "R project location path"
+ Results_Path <- paste0(Main_Path,"Results\\")
+ Input_Path <- paste0(Main_Path,"Input Data\\")
+ Model_Code <- paste0(Main_Path,"Model Code\\")
 
-# Load Custom Functions
-source(paste0(Model_Code,"Trim.R"))
-source(paste0(Model_Code,"Dim Date Creator.R"))
-source(paste0(Model_Code,"Interaction Formula.R"))
+ # Load Custom Functions
+ source(paste0(Model_Code,"Trim.R"))
+ source(paste0(Model_Code,"Dim Date Creator.R"))
+ source(paste0(Model_Code,"Interaction Formula.R"))
 
 # Prepared Factors to load
+# We will be using rxLinMod for modeling as oppose to a time-series algorithm
+# thus we are using the date parts as factors, so we have to explicitly define them
+# and changing the data type of address to a factor
 ccColInfo <- list(		
   MONTH = list(
     type = "factor", 
@@ -38,8 +53,26 @@ ccColInfo <- list(
     type = "numeric")
 )
 
-# Create Xdf file from the Cleaned US Pollutin Data 2010 - 2016
+######################### R SERVER and Xdf file format #################
+#
+# Microsoft R Server, i.e. Revolutions Analytics provides the ability to 
+# operate on large datasets that do not fit into RAM memory.
+# This physical data struture called Xdf allows you to scale.  The algorithms
+# and functions provided by MRS (rx, Rx) are optimized for this structure.
+# 
+# Create Xdf file from the cleaned US Pollutin Data 2010 - 2016.
+# Note: you can use the rx modeling functions with dataframes as well.
+# 
+# This demonstrates how to read in a text file and create and Xdf file from it.
+# Notice in the environment window after this runs the Xdf file is not listed.
+# You can see it physically stored in the InputPath directory
+#----------------------
+
+
+
 inFile <- file.path(Input_Path, "US Pollution Data 2010_2016.csv")
+class(inFile)
+
 rxTextToXdf(inFile = inFile,
             outFile = paste0(Input_Path,"rxUS Pollution Data.xdf"),
             colInfo = ccColInfo,
@@ -47,12 +80,20 @@ rxTextToXdf(inFile = inFile,
             rowsPerRead = 200000,
             overwrite = TRUE)
 
-# Create Pollution Xdf file
-df_Xdf <- RxXdfData(paste0(Input_Path,"rxUS Pollution Data.xdf"))
-rxGetInfo(data = df_Xdf, numRows = 0, getVarInfo =T)
 
+# Create a pointer to the Pollution Xdf file, you don't load it into memory as with Open R
+# Notice in the environment window df_Xdf is listed under "Values" and not "Data
+# because you created a pointer to where the Xdf file is located
+
+df_Xdf <- RxXdfData(paste0(Input_Path,"rxUS Pollution Data.xdf"))
+rxGetInfo(data = df_Xdf, numRows = 1, getVarInfo =T)
+
+
+#--------repeat for the projection data 
 # Create Xdf file from the Cleaned US Pollutin 1 YEAR Projection Data
-inFile <- file.path(Input_Path, "US Pollution 2016_2017 Projections.csv")
+inFile <- file.path(Input_Path, "US Pollution 2016_2017 Projections.csv") 
+
+#This converts the csv to an Xdf file
 rxTextToXdf(inFile = inFile,
             outFile = paste0(Input_Path,"rxUS Pollution Projection Data.xdf"),
             # stringsAsFactors = T, 
@@ -60,15 +101,15 @@ rxTextToXdf(inFile = inFile,
             colInfo = ccColInfo,
             overwrite = TRUE)
 
-# Create Polllution Xdf file
+# Create a pointer to the Xdf file
 df_Proj_Xdf <- RxXdfData(paste0(Input_Path,"rxUS Pollution Projection Data.xdf"))
-rxGetInfo(data = df_Xdf, numRows = 0, getVarInfo =T)
+rxGetInfo(data = df_Proj_Xdf, numRows = 0, getVarInfo =T)
 
 # Create Date Dimension
 Dates <- Dim_Date_Creator("2000-01-01", "2020-12-31")
 
 #################################################################
-# EXPLORATORY DATA ANALYSIS
+# EXPLORATORY DATA ANALYSIS - rx FUNCTIONS
 #################################################################
 
 # Summarize Pollution Numeric Data
@@ -78,11 +119,15 @@ Dates <- Dim_Date_Creator("2000-01-01", "2020-12-31")
 (PollutionSummary <- rxSummary(formula = ~ NO2_MEAN + O3_MEAN + SO2_MEAN + CO_MEAN,
                                data = df_Proj_Xdf))
 
-# DV Histograms
+#Take a look at PollutionSummary using class() and str()
+class(PollutionSummary)
+str(PollutionSummary)
+
+### Histograms
 
 # Nitrogen Dioxide
 rxHistogram(~ NO2_MEAN, data = df_Xdf, 
-            histType = "Percent")
+            histType = "Percent",fillColor = "forestgreen")
 
 # Ozone
 rxHistogram(~ O3_MEAN, data = df_Xdf, 
@@ -96,7 +141,8 @@ rxHistogram(~ I(log(SO2_MEAN)), data = df_Xdf,
 rxHistogram(~ CO_MEAN, data = df_Xdf, 
             histType = "Percent")
 
-# Create Cross Tabulation of Data 
+
+#----- Create Cross Tabulation of Data 
 
 # NO2 Data Cube
 cube1 <- rxCube(NO2_MEAN ~ F(SO2_MEAN):F(CO_MEAN), 
@@ -109,7 +155,7 @@ levelplot(NO2_MEAN ~ SO2_MEAN * CO_MEAN, data = cubePlot)
 
 # Cor Matrix
 Pollution_Cors <- rxCor(~ NO2_MEAN + O3_MEAN + SO2_MEAN  + CO_MEAN, data = df_Xdf)
-corrplot(Pollution_Cors,"number")
+corrplot(Pollution_Cors,"number", outline=FALSE, tl.offset = 0.5)
 
 #################################################################
 # CREATE MODEL DATA and FORMULAE
@@ -118,14 +164,14 @@ corrplot(Pollution_Cors,"number")
 rxGetInfo(data = df_Xdf, numRows = 3, getVarInfo =T)
 rxGetInfo(data = df_Proj_Xdf, numRows = 0, getVarInfo =T)
 
-# Format df_Xdf
+# Format df_Xdf and arrange Xdf so it looks like a forecasting data set
 df_Xdf <- df_Xdf  %>%  
           arrange(DIM_ADDRESS_KEY, DIM_DATE_KEY) %>%
           mutate(DATE = as.Date(DATE))
 
-rxGetInfo(data = df_Xdf, numRows = 0, getVarInfo =T)
+#rxGetInfo(data = df_Xdf, numRows = 0, getVarInfo =T)
 
-# Format df_Xdf
+# Format df_Proj_Xdf so that it matches the historic data
 df_Proj_Xdf <- df_Proj_Xdf  %>%
   arrange(DIM_ADDRESS_KEY,DIM_DATE_KEY) %>%
   mutate(DATE = as.Date(DATE))
@@ -207,9 +253,10 @@ CO_LM_Model <- rxLinMod(CO_Formula, data = df_Xdf)
 #########################
 # Predictions
 #########################
-# Create a df_Pred_Xdf object
+# Create a df_Pred_Xdf object - this just defines the name and location, the next step will 
+# caluculate the actual predictions
 df_Pred_Xdf <- RxXdfData(paste0(Results_Path,"rxPollution Predictions.xdf"))
-rxGetInfo(df_Pred_Xdf, numRows = 2)
+rxGetInfo(df_Pred_Xdf, numRows = 2) #you'll get an error message here because the predictions are calculated in the next step
 
 rxPredict(modelObject = NO2_LM_Model, 
           data = df_Proj_Xdf,
@@ -262,23 +309,27 @@ rxPredict(modelObject = CO_LM_Model,
 rxGetInfo(data = df_Pred_Xdf, numRows = 2, getVarInfo =T)
 
 # Create a df_Pred_Xdf object
-df_Pred_Xdf <- RxXdfData(paste0(Results_Path,"rxPollution Predictions.xdf"))
+#df_Pred_Xdf <- RxXdfData(paste0(Results_Path,"rxPollution Predictions.xdf"))
 rxGetInfo(df_Pred_Xdf, numRows = 2)
+class(df_Pred_Xdf)
 
+#  subset projections to keep only predictions
 #  Format df_Pred_Xdf object into standard data tibble
-df_Pred_Xdf <- tbl_df(df_Pred_Xdf) %>%
-               select(DIM_ADDRESS_KEY, DIM_DATE_KEY, NO2_PRED, O3_PRED, SO2_PRED, CO_PRED) %>% 
-               rename(NO2_MEAN = NO2_PRED,
-                      O3_MEAN = O3_PRED,
-                      SO2_MEAN = SO2_PRED,
-                      CO_MEAN = CO_PRED)
+df_Pred_Xdf <- df_Pred_Xdf%>%
+       select(DIM_ADDRESS_KEY, DIM_DATE_KEY, NO2_PRED, O3_PRED, SO2_PRED, CO_PRED)%>% 
+        rename(NO2_MEAN = NO2_PRED,
+         O3_MEAN = O3_PRED,
+         SO2_MEAN = SO2_PRED,
+         CO_MEAN = CO_PRED)
+
 
 # Round Predicted Mean Variables
-df_Pred_Xdf[,c("NO2_MEAN", "O3_MEAN", "SO2_MEAN", "CO_MEAN")] <- 
-  sapply(df_Pred_Xdf[,c("NO2_MEAN", "O3_MEAN", "SO2_MEAN", "CO_MEAN")],
-         function(x) round(x,3))
+#df_Pred_Xdf[,c("NO2_MEAN", "O3_MEAN", "SO2_MEAN", "CO_MEAN")] <- 
+#  sapply(df_Pred_Xdf[,c("NO2_MEAN", "O3_MEAN", "SO2_MEAN", "CO_MEAN")],
+#         function(x) round(x,3))
 
 
 # Write out pollution data to the results path
 write.csv(df_Pred_Xdf, paste0(Results_Path,"US Pollution 2016_2017 Predictions.csv"),row.names = F)
 
+#This can take a few minutes

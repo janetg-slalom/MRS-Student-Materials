@@ -1,20 +1,22 @@
+#Description:
+# ---------------------------
+# connect to SQL Server 2016 and 
+# use the R engine via R Services
+#-----------------------------
+#
+#Date: March 2017
+#Author: Dan Tetrick
+#
+#
+#
 # Set Options
-options(stringsAsFactors = F)
-options(scipen = 999)
 
-# Select Packages to Load
-pkgs <- c("readr", "lubridate", "corrplot", "tidyr","stringr","lattice",
-          "RevoScaleR","RevoMods", "dplyr","dplyrXdf")
+# # Set Paths 
+ Main_Path <- "R project path"
+# Results_Path <- paste0(Main_Path,"Results\\")
+# Input_Path <- paste0(Main_Path,"Input Data\\")
+ Model_Code <- paste0(Main_Path,"Model Code\\")
 
-# Load Libraries and Source Codes
-sapply(pkgs, require, character.only = T)
-
-# Set Paths 
-Main_Path <- "<SQL Server and R Services folder path>"
-Results_Path <- paste0(Main_Path,"Results/")
-Input_Path <- paste0(Main_Path,"Input Data/")
-Model_Code <- paste0(Main_Path,"Model Code/")
-SQLConn_Path <- "<SQL Server login string>"
 
 # Load Custom Functions
 source(paste0(Model_Code,"Trim.R"))
@@ -22,7 +24,12 @@ source(paste0(Model_Code,"Dim Date Creator.R"))
 source(paste0(Model_Code,"Interaction Formula.R"))
 
 # Set Connection String to the SQL DB
-load(paste0(SQLConn_Path, "<SQL Server login string name>"))
+#load(paste0(SQLConn_Path, "<SQL Server login string name>"))
+
+sqlConnString <- "driver={SQL Server};
+                  server=<SQL Server name>;
+                  database=<database name>;
+                  trusted_connection=true"
 
 # SQL Rows per Read
 sqlRowsPerRead <- 100000
@@ -51,41 +58,34 @@ ccColInfo <- list(
     type = "numeric")
 )
 
-# Creating an SQL query
-# df_Query <- paste0("SELECT [DIM_ADDRESS_KEY], [DIM_DATE_KEY], [DATE], [YEAR], [MONTH], [DAY], ",
-#                    "avg([NO2_MEAN]) as NO2_MEAN, ",
-#                    "avg([O3_MEAN]) as O3_MEAN, ",
-#                    "avg([SO2_MEAN]) as SO2_MEAN, ",
-#                    "avg([CO_MEAN]) as CO_MEAN ",
-#                    "FROM [dbo].[Fact_US_Pollution_Historical] ",
-#                    "GROUP BY [DIM_ADDRESS_KEY], [DIM_DATE_KEY], [DATE], [YEAR], [MONTH], [DAY]")
 
 # Creating an RxSqlServerData Data Source to historical and projection data
-df_sql <- RxSqlServerData(# sqlQuery = df_Query
-                          connectionString = sqlConnString,
+df_sql <- RxSqlServerData(connectionString = sqlConnString,
                           table = "Fact_US_Pollution_Historical",
                           colInfo = ccColInfo,
                           rowsPerRead = sqlRowsPerRead)
 rxGetInfo(data = df_sql, numRows = 5, getVarInfo =T)
 
 
-df_sql_Score <- RxSqlServerData(connectionString = sqlConnString, 
+df_sql_Score <- RxSqlServerData(connectionString = sqlConnString,
                               table = "Fact_US_Pollution_Projected",
                               colInfo = ccColInfo,
                               rowsPerRead = sqlRowsPerRead)
-rxGetInfo(data = df_sql_Score, numRows = 5, getVarInfo =T)
+rxGetInfo(data = df_sql_Score, numRows = 5, getVarInfo =T) # you get an error message the first time your run this, because it doesn't exists yet
 
 
-df_sql_Pred <- RxSqlServerData(table = "Fact_US_Pollution_SQLContextPredicted", 
+df_sql_Pred <- RxSqlServerData(table = "Fact_US_Pollution_SQLContextPredicted",
                                connectionString = sqlConnString,
                                rowsPerRead = sqlRowsPerRead, colInfo = ccColInfo)
-rxGetInfo(data = df_sql_Pred, numRows = 5, getVarInfo =T)
+
+rxGetInfo(data = df_sql_Pred, numRows = 5, getVarInfo =T) # you get an error message the first time your run this, because it doesn't exists yet
+
 
 # Set SQL Compute Context 
 sqlWait <- TRUE
 sqlConsoleOutput <- FALSE
 
-# A Troubleshooting RxInSqlServer Compute Context
+# Set parameters for Compute Context
 sqlComputeTrace <- RxInSqlServer(
   connectionString = sqlConnString, 
   shareDir = sqlShareDir,
@@ -99,7 +99,7 @@ sqlComputeTrace <- RxInSqlServer(
 ####################################
 rxSetComputeContext(sqlComputeTrace)
 
-# Get info about data and a 20 row sample
+# Get info about data and a 2 row sample
 rxGetInfo(data = df_sql, numRows = 2, getVarInfo =T)
 
 # Get Pollution Summary from df_sql
@@ -111,8 +111,8 @@ rxHistogram(~ SO2_MEAN, data = df_sql, histType = "Percent")
 rxHistogram(~ CO_MEAN, data = df_sql, histType = "Percent")
 rxHistogram(~ O3_MEAN, data = df_sql, histType = "Percent")
 
-# Prepare CubePlot
-rxSetComputeContext("local")
+# Prepare CubePlot - switched back to local context
+rxSetComputeContext("local") 
 (cube1 <- rxCube(NO2_MEAN ~ F(SO2_MEAN):F(CO_MEAN), data = df_sql))
 cubePlot <- rxResultsDF(cube1)
 
@@ -181,7 +181,7 @@ CO_Formula <- Interaction_Formula(DV = "CO_MEAN",
 # Create Models and Predict 
 ##############################
 
-rxSetComputeContext(sqlComputeTrace)
+#drop the prediction table incase it exists since we're going to create it
 
 if (rxSqlServerTableExists(df_sql_Pred)) rxSqlServerDropTable(df_sql_Pred)
 
@@ -191,7 +191,6 @@ NO2_LM_Model <- rxLinMod(NO2_Formula,
                          data = df_sql)
 summary(NO2_LM_Model)
 
-rxSetComputeContext("local")
 rxPredict(modelObject = NO2_LM_Model, 
           data = df_sql_Score,
           outData = df_sql_Pred,
@@ -218,7 +217,6 @@ rxPredict(modelObject = O3_LM_Model,
           checkFactorLevels = T,
           extraVarsToWrite = c("DIM_DATE_KEY","NO2_PRED"),
           overwrite = T)
-
 
 rxGetInfo(data = df_sql_Pred, numRows = 2, getVarInfo =T)
 
@@ -255,3 +253,4 @@ rxPredict(modelObject = CO_LM_Model,
 
 rxGetInfo(data = df_sql_Pred, numRows = 2, getVarInfo =T)
 
+#-----------END

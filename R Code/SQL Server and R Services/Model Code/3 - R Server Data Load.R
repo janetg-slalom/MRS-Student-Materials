@@ -1,28 +1,46 @@
-# Set Options
-options(stringsAsFactors = F)
-options(scipen = 999)
+#Description:
+# --------------------
+# This third script demonstrates how to connect to SQL Server
+# and use ScaleR functions to load text files into a db.
+# There are equivalent functions for Teradata.
+# --------------------
+#
+#Date: March 2017
+#Author: Dan Tetrick
+#
+#
 
-# Select Packages to Load
-pkgs <- c("readr", "lubridate", "corrplot", "tidyr","stringr","lattice",
-          "RevoScaleR","RevoMods", "dplyr","dplyrXdf")
-
-# Load Libraries and Source Codes
-sapply(pkgs, require, character.only = T)
+# # Set Options
+ options(stringsAsFactors = F)
+ options(scipen = 999)
+ 
+ # Select Packages to Load
+ pkgs <- c("readr", "lubridate", "corrplot", "tidyr","stringr","lattice"
+           , "RevoScaleR","RevoMods", "dplyr","dplyrXdf"
+           , "RODBC", "gglot2", "sqldf")
+ 
+ # Load Libraries and Source Codes
+ sapply(pkgs, require, character.only = T)
 
 # Set Paths 
-Main_Path <- "<SQL Server and R Services folder path>"
-Results_Path <- paste0(Main_Path,"Results/")
-Input_Path <- paste0(Main_Path,"Input Data/")
-Model_Code <- paste0(Main_Path,"Model Code/")
-SQLConn_Path <- "<SQL Server login string>"
+Main_Path <- "R Project path"
+Results_Path <- paste0(Main_Path,"Results\\")
+Input_Path <- paste0(Main_Path,"Input Data\\")
+Model_Code <- paste0(Main_Path,"Model Code\\")
+#SQLConn_Path <- this is Dan's path to the file which holds the sql connection string
+#odbcCloseAll()
+
+#this is used later to feed into the load function
+sqlConnString <- "driver={SQL Server};
+                  server=<SQL Server name>;
+                  database=<database name>;
+                  trusted_connection=true"
 
 # Load Custom Functions
 source(paste0(Model_Code,"Trim.R"))
 source(paste0(Model_Code,"Dim Date Creator.R"))
 source(paste0(Model_Code,"Interaction Formula.R"))
 
-# Set Connection String to the SQL DB
-load(paste0(SQLConn_Path, "<SQL Server login string name>"))
 
 # Set file paths to data to import into SQL Server
 LoadData1 <- file.path(Input_Path, "US Pollution Data 2010_2016.csv")
@@ -45,14 +63,14 @@ sqlRowsPerRead <- 200000
 # Using a SQL Server Data Source and Compute Context
 ##########################################################  
 
-# Creating an RxSqlServerData Data Source
-sqlPollutionHistDS <- RxSqlServerData(connectionString = sqlConnString,
+# Creating an RxSqlServerData Data definition to load into the db
+sqlPollutionHistDS <- RxSqlServerData(connectionString =sqlConnString, 
                                       table = sqlLoadTable1,
                                       rowsPerRead = sqlRowsPerRead)
 
 sqlProjectionsDS <- RxSqlServerData(connectionString = sqlConnString,
-                                    table = sqlLoadTable2,
-                                    rowsPerRead = sqlRowsPerRead)
+                                   table = sqlLoadTable2,
+                                   rowsPerRead = sqlRowsPerRead)
 
 sqlDatesDS <- RxSqlServerData(connectionString = sqlConnString,
                               table = sqlLoadTable3,
@@ -123,11 +141,11 @@ inTextData <- RxTextData(file = LoadData1,
 rxDataStep(inData = inTextData, outFile = sqlPollutionHistDS, overwrite = TRUE)
 
 # Load XDF predictions
-  inTextData <- RxTextData(file = LoadData2, 
+  inTextData <- RxTextData(file = LoadData2,
                            colClasses = c("DIM_DATE_KEY" = "numeric",
                                           "DIM_ADDRESS_KEY" = "numeric",
                                           "DATE" = "character",
-                                          "MONTH" = "numeric",          
+                                          "MONTH" = "numeric",
                                           "DAY" = "numeric",
                                           "YEAR" = "numeric",
                                           "NO2_MEAN" = "numeric",
@@ -166,7 +184,7 @@ rxDataStep(inData = inTextData, outFile = sqlPollutionHistDS, overwrite = TRUE)
                                           "O3_MEAN_LAG_7" = "numeric",
                                           "SO2_MEAN_LAG_7" = "numeric",
                                           "CO_MEAN_LAG_7" = "numeric"))
-  
+
   rxDataStep(inData = inTextData, outFile = sqlProjectionsDS, overwrite = TRUE)
 
 # Load Dim Date Table 
