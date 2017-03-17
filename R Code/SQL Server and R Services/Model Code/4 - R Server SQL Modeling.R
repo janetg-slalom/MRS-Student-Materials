@@ -1,11 +1,11 @@
 #Description:
 # ---------------------------
-# connect to SQL Server 2016 and 
+# Connect to SQL Server 2016 and 
 # use the R engine via R Services
 #-----------------------------
 #
 #Date: March 2017
-#Author: Dan Tetrick
+#Author: Dan Tetrick, Slalom Consulting
 #
 #
 #
