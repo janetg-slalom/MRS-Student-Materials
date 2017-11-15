@@ -22,7 +22,7 @@ pkgs <- c("readr", "lubridate", "tidyr", "stringr", "Matrix", "corrplot",
 sapply(pkgs, require, character.only = T)
 
 # Set Paths 
-Main_Path <- "C:/Users/dan.tetrick/Documents/US-Pollution-R-Server-Demo/"
+Main_Path <- "C:/Users/dan.tetrick/Documents/MRS-Student-Materials/R Code/SQL Server and R Services/"
 Results_Path <- paste0(Main_Path,"Results/")
 Input_Path <- paste0(Main_Path,"Input Data/")
 Clean_Data_Path <- paste0(Input_Path, "Cleaned Data/")
@@ -51,6 +51,9 @@ sapply(list.files(Clean_Code_Path, ".R$", full.names = T), source)
 # Source in Utility Functions
 sapply(list.files(Utility_Path, ".R$", full.names = T), source)
 
+# Set Row Read 
+Row.Read <- 100000
+
 ###################################################################################################
 # Create 20 year Date Dimension data
 ###################################################################################################
@@ -71,7 +74,7 @@ write_csv(Dates, paste0(Clean_Data_Path,"Date Dimension Table.csv"))
 df_Hist <- read_csv(paste0(Raw_Data_Path, "pollution_us_2000_2016.csv"))
 
 # Clean Historical Pollution
-df_Hist <- Clean_Pollution_Historical(df_Hist, write_out = FALSE)
+df_Hist <- Clean_Pollution_Historical(df_Hist, write_out = TRUE)
 
 ###################################################################################################
 # Create 2016-2017 US Pollution Projection Data
@@ -114,7 +117,7 @@ df_Date_Xdf <- RxXdfData(Xdfs[[1]])
 
 df_Address_Xdf <- RxXdfData(Xdfs[[2]])
 
-df_Proj_Xdf <- RxXdfData(Xdfs[[4]])%>%
+df_Proj_Xdf <- RxXdfData(Xdfs[[4]]) %>%
                arrange(DIM_ADDRESS_KEY,DIM_DATE_KEY) %>%
                mutate(DATE = as.Date(DATE))
 
@@ -123,7 +126,7 @@ df_Hist_Xdf <- RxXdfData(Xdfs[[5]])%>%
                mutate(DATE = as.Date(DATE))
 
 # View Data as Xdf
-rxGetInfo(data = df_Proj_Xdf, numRows = 1000, getVarInfo =T)
+rxGetInfo(data = df_Proj_Xdf, numRows = 10, getVarInfo =T)
 
 ###################################################################################################
 # Xploratory Data Analysis with Xdf
@@ -131,7 +134,7 @@ rxGetInfo(data = df_Proj_Xdf, numRows = 1000, getVarInfo =T)
  
 # Summarize Pollution Historical Data
 (Historical_Summary <- rxSummary(formula = ~ NO2_MEAN + O3_MEAN + SO2_MEAN + CO_MEAN,
-                               data = df_Hist_Xdf))
+                                 data = df_Hist_Xdf))
 
 (Projection_Summary <- rxSummary(formula = ~ NO2_MEAN + O3_MEAN + SO2_MEAN + CO_MEAN,
                                data = df_Proj_Xdf))
@@ -171,7 +174,7 @@ levelplot(NO2_MEAN ~ SO2_MEAN * CO_MEAN, data = cubePlot)
 # Create and Plot Correlation Matrix
 ##########################################
 
-Pollution_Cors <- rxCor(~ NO2_MEAN + O3_MEAN + SO2_MEAN  + CO_MEAN, data = df_Hist_Xdf)
+(Pollution_Cors <- rxCor(~ NO2_MEAN + O3_MEAN + SO2_MEAN  + CO_MEAN, data = df_Hist_Xdf))
 corrplot(Pollution_Cors,"number")
 
 ###################################################################################################
@@ -218,6 +221,7 @@ CO_Model$Summary
 ############################
 # SO2 Modeling
 ############################
+
 SO2_Model <- Create_Pollution_Models(df_Hist_Xdf, DV = "SO2_MEAN",
                                      IVint = c("NO2_MEAN", "CO_MEAN","SO2_MEAN","O3_MEAN"),
                                      VarOmit = c("DATE", "COUNTY", "STATE", "SITE_NUM", "DIM_DATE_KEY",
@@ -229,16 +233,22 @@ SO2_Model$Summary
 ###################################################################################################
 # Predict Models onto Projections
 ###################################################################################################
-VarsToKeep <- c("DIM_DATE_KEY", "NO2_PRED", "O3_PRED", "SO2_PRED", "CO_PRED")
 
 # Create a df_Pred_Xdf object
 df_Pred_Xdf <- RxXdfData(paste0(Results_Path,"rxPollution Predictions.xdf"))
 
 # Predict each pollutant
-df_Pred_Xdf <- Create_Pollution_Predictions(df_Proj_Xdf, NO2_Model$Model,name = "NO2_PRED", VarsToKeep)
-df_Pred_Xdf <- Create_Pollution_Predictions(df_Pred_Xdf, O3_Model$Model,name = "O3_PRED", VarsToKeep)
-df_Pred_Xdf <- Create_Pollution_Predictions(df_Pred_Xdf, CO_Model$Model,name = "CO_PRED", VarsToKeep)
-df_Pred_Xdf <- Create_Pollution_Predictions(df_Pred_Xdf, SO2_Model$Model,name = "SO2_PRED", VarsToKeep)
+df_Pred_Xdf <- Create_Pollution_Predictions(df_Proj_Xdf, NO2_Model$Model,name = "NO2_PRED",
+                                            VarsToKeep = c("DIM_DATE_KEY"))
+
+df_Pred_Xdf <- Create_Pollution_Predictions(df_Pred_Xdf, O3_Model$Model,name = "O3_PRED",
+                                            VarsToKeep = c("DIM_DATE_KEY", "NO2_PRED"))
+
+df_Pred_Xdf <- Create_Pollution_Predictions(df_Pred_Xdf, CO_Model$Model,name = "CO_PRED",
+                                            VarsToKeep = c("DIM_DATE_KEY", "NO2_PRED", "O3_PRED"))
+
+df_Pred_Xdf <- Create_Pollution_Predictions(df_Pred_Xdf, SO2_Model$Model,name = "SO2_PRED",
+                                            VarsToKeep = c("DIM_DATE_KEY", "NO2_PRED", "O3_PRED", "CO_PRED"))
 
 # Create a df_Pred_Xdf object
 rxGetInfo(df_Pred_Xdf, numRows = 2)
@@ -246,6 +256,7 @@ rxGetInfo(df_Pred_Xdf, numRows = 2)
 ###################################################################################################
 # Finalize Model Data
 ###################################################################################################
+
 #  Format df_Pred_Xdf object into standard data tibble
 df_Pred_Xdf <- tbl_df(df_Pred_Xdf) %>%
                select(DIM_ADDRESS_KEY, DIM_DATE_KEY, NO2_PRED, O3_PRED, SO2_PRED, CO_PRED) %>% 
@@ -267,9 +278,7 @@ Load_Pollution_SQL()
 
 ####################################################################################################
 # Load All Data to SQL
-###################################################################################################
-SQL_Data <- IN_SQL_Pollution_Model(Row.Read = 200000)
-
-
+##################################################################################################
+SQL_Data <- IN_SQL_Pollution_Model()
 
 # END

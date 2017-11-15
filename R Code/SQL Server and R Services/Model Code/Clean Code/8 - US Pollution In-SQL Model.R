@@ -1,4 +1,6 @@
-IN_SQL_Pollution_Model <- function(Row.Read = 200000) {
+IN_SQL_Pollution_Model <- function() {
+  
+  Row.Read = 200000
   
   # Prepared Factors to load
   ccColInfo <- list(		
@@ -17,6 +19,7 @@ IN_SQL_Pollution_Model <- function(Row.Read = 200000) {
     YEAR = list(
       type = "numeric")
   )
+  
   
 # Creating an SQL query
 # df_Query <- paste0("SELECT [DIM_ADDRESS_KEY], [DIM_DATE_KEY], [DATE], [YEAR], [MONTH], [DAY], ",
@@ -47,14 +50,12 @@ df_sql_Pred <- RxSqlServerData(table = "Fact_US_Pollution_SQLContextPredicted",
                                connectionString = sqlConnString,
                                rowsPerRead = Row.Read, 
                                colInfo = ccColInfo)
-rxGetInfo(data = df_sql_Pred, numRows = 5, getVarInfo =T)
 
-# Create transformations
-rxDataStep(inData = df_sql,
-           outFile = df_sql,
-           transforms = list(DATE = as.Date(DATE, format="%Y-%m-%d")),
-           transformPackages = "lubridate",
-           overwrite = T)
+# # Create transformations
+# rxDataStep(inData = df_sql,
+#            outFile = df_sql,
+#            transforms = list(DATE = as.Date(DATE, format="%Y-%m-%d"))
+#            overwrite = T)
 
 
 # A Troubleshooting RxInSqlServer Compute Context
@@ -84,7 +85,7 @@ rxGetInfo(data = df_sql, numRows = 2, getVarInfo =T)
 ########################
 
 # Nitrogen Dioxide
-rxHistogram(~ NO2_MEAN, data = df_Hist_Xdf, 
+rxHistogram(~ NO2_MEAN, data = df_sql, 
             histType = "Percent")
 
 ###################################################################################################
@@ -144,13 +145,16 @@ SO2_Model$Summary
 ###################################################################################################
 # Predict Models onto Projections
 ###################################################################################################
-VarsToKeep <- c("DIM_DATE_KEY", "NO2_PRED", "O3_PRED", "SO2_PRED", "CO_PRED")
+
 rxSetComputeContext("local")
+
 # Predict each pollutant
-df_sql_Pred <- Create_Pollution_Predictions(df_sql_Score, NO2_Model$Model,name = "NO2_PRED", VarsToKeep)
-df_sql_Pred <- Create_Pollution_Predictions(df_sql_Pred, O3_Model$Model,name = "O3_PRED", VarsToKeep)
-df_sql_Pred <- Create_Pollution_Predictions(df_sql_Pred, CO_Model$Model,name = "CO_PRED", VarsToKeep)
-df_sql_Pred <- Create_Pollution_Predictions(df_sql_Pred, SO2_Model$Model,name = "SO2_PRED", VarsToKeep)
+df_sql_Pred <- Create_Pollution_Predictions(df_sql_Score, NO2_Model$Model, name = "NO2_PRED", df_sql_Pred, VarsToKeep = c("DIM_DATE_KEY"))
+
+df_sql_Pred <- Create_Pollution_Predictions(df_sql_Pred, O3_Model$Model,name = "O3_PRED", df_sql_Pred, VarsToKeep = c("DIM_DATE_KEY", "NO2_PRED"))
+df_sql_Pred <- Create_Pollution_Predictions(df_sql_Pred, CO_Model$Model,name = "CO_PRED", df_sql_Pred, VarsToKeep = c("DIM_DATE_KEY", "NO2_PRED", "O3_PRED"))
+df_sql_Pred <- Create_Pollution_Predictions(df_sql_Pred, SO2_Model$Model,name = "SO2_PRED",df_sql_Pred, VarsToKeep = c("DIM_DATE_KEY", "NO2_PRED", "O3_PRED", "CO_PRED"))
+
 
 # Create a df_Pred_Xdf object
 rxGetInfo(df_sql_Pred, numRows = 2)
@@ -158,20 +162,18 @@ rxGetInfo(df_sql_Pred, numRows = 2)
 # ###################################################################################################
 # # Finalize Model Data
 # ###################################################################################################
-# #  Format df_Pred_Xdf object into standard data tibble
-# df_sql_Pred <- tbl_df(df_sql_Pred) %>%
-#   select(DIM_ADDRESS_KEY, DIM_DATE_KEY, NO2_PRED, O3_PRED, SO2_PRED, CO_PRED) %>% 
-#   rename(NO2_MEAN = NO2_PRED,
-#          O3_MEAN = O3_PRED,
-#          SO2_MEAN = SO2_PRED,
-#          CO_MEAN = CO_PRED) %>% 
-#   mutate_each(funs(round(.,3)), NO2_MEAN, O3_MEAN, SO2_MEAN, CO_MEAN)
-# 
-# 
-# # Write out pollution data to the results path
-# write_csv(df_Pred_sql, paste0(Clean_Data_Path,"US Pollution 2016_2017 Predictions.csv"))
+#  Format df_Pred_Xdf object into standard data tibble
+df_sql_Pred <- tbl_df(rxImport(df_sql_Pred)) %>%
+              select(DIM_ADDRESS_KEY, DIM_DATE_KEY, NO2_PRED, O3_PRED, SO2_PRED, CO_PRED) %>%
+              rename(NO2_MEAN = NO2_PRED,
+                     O3_MEAN = O3_PRED,
+                     SO2_MEAN = SO2_PRED,
+                     CO_MEAN = CO_PRED) %>%
+              mutate_each(funs(round(.,3)), NO2_MEAN, O3_MEAN, SO2_MEAN, CO_MEAN)
 
 
+# Write out pollution data to the results path
+write_csv(df_sql_Pred, paste0(Clean_Data_Path,"US Pollution 2016_2017 Predictions SQL Context.csv"))
 
-return(sqlData)
+
 }

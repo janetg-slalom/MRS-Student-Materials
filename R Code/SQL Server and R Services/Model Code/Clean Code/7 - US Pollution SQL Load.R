@@ -42,6 +42,18 @@ sqlPollutionPredXdfDS <- RxSqlServerData(connectionString = sqlConnString,
                                          table = sqlLoadTable5,
                                          rowsPerRead = sqlRowsPerRead)
 
+# library(RODBC)
+# 
+# sqlConnString <- "Driver=SQL Server;Server=32849-M5510\\INDIGO_RIVERS;Database=R Server Demo;trusted_connection=yes"
+# 
+# sqlConnString
+# dbhandle <- odbcDriverConnect(sqlConnString)   
+# 
+# df2 <- sqlQuery(dbhandle,"SELECT * FROM [dbo].[Fact_US_Pollution_Projected]")
+# 
+# save(sqlConnString, file = paste0(SQL_Path, "Windows Trusted SQL String - R Server Demo.Rda"))
+
+
 ###############################################################
 # Using rxDataStep to Load the Sample Data into SQL Server
 ###############################################################
@@ -191,5 +203,8 @@ inTextData <- RxTextData(file = LoadData5,
                                          "CO_MEAN" = "numeric")
                          )
 rxDataStep(inData = inTextData, outFile = sqlPollutionPredXdfDS, overwrite = TRUE)
+
+
+
 
 }
